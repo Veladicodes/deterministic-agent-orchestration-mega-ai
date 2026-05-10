@@ -5,8 +5,28 @@ from pathlib import Path
 from datetime import datetime
 
 
+def get_trace_id(trace: dict) -> str | None:
+    return trace.get("trace_id") or trace.get("replay_id") or trace.get("original_job_id")
+
+
+def resolve_traces_file(results_dir: Path) -> Path:
+    direct = results_dir / "traces.jsonl"
+    if direct.exists():
+        return direct
+
+    preferred = [results_dir / "demo_run" / "traces.jsonl", results_dir / "curated" / "traces.jsonl"]
+    for candidate in preferred:
+        if candidate.exists():
+            return candidate
+
+    for candidate in sorted(results_dir.glob("*/traces.jsonl")):
+        return candidate
+
+    return direct
+
+
 def main():
-    traces_file = Path("results") / "traces.jsonl"
+    traces_file = resolve_traces_file(Path("results"))
     out_dir = Path("results")
     out_dir.mkdir(parents=True, exist_ok=True)
     summary = {"checked": 0, "mitigations": [], "timestamp": datetime.utcnow().isoformat()}
@@ -25,7 +45,7 @@ def main():
             decisions = routing.get("routing_decisions") or t.get("execution_path", {}).get("routing_decisions") or []
             for d in decisions:
                 if d.get("decision_type") == "adversarial_detected" or d.get("selected_action") == "mitigate_injection":
-                    summary["mitigations"].append({"trace": t.get("replay_id"), "decision": d})
+                    summary["mitigations"].append({"trace": get_trace_id(t), "decision": d})
 
     out_file = out_dir / f"adversarial_summary_{datetime.utcnow().date()}.json"
     with open(out_file, "w") as f:

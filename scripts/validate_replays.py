@@ -15,6 +15,26 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from evaluation.replay import ExecutionReplayer
 
 
+def get_trace_id(trace: dict) -> str | None:
+    return trace.get("trace_id") or trace.get("replay_id") or trace.get("original_job_id")
+
+
+def resolve_traces_file(results_dir: Path) -> Path:
+    direct = results_dir / "traces.jsonl"
+    if direct.exists():
+        return direct
+
+    preferred = [results_dir / "demo_run" / "traces.jsonl", results_dir / "curated" / "traces.jsonl"]
+    for candidate in preferred:
+        if candidate.exists():
+            return candidate
+
+    for candidate in sorted(results_dir.glob("*/traces.jsonl")):
+        return candidate
+
+    return direct
+
+
 def load_traces(file_path: Path):
     traces = []
     if not file_path.exists():
@@ -30,14 +50,14 @@ def load_traces(file_path: Path):
 
 
 def main():
-    traces_file = Path("results") / "traces.jsonl"
+    traces_file = resolve_traces_file(Path("results"))
     traces = load_traces(traces_file)
     replayer = ExecutionReplayer()
 
     summary = {"checked": len(traces), "valid": 0, "invalid": 0, "details": []}
 
     for t in traces:
-        trace_id = t.get("replay_id") or t.get("original_job_id")
+        trace_id = get_trace_id(t)
         computed = replayer.compute_trace_hash({
             "query": t.get("query"),
             "agent_sequence": t.get("agent_sequence"),

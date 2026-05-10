@@ -20,6 +20,10 @@ from shared.logging import get_logger
 logger = get_logger("eval_cli.replay_query")
 
 
+def get_trace_id(trace_dict: dict) -> str | None:
+    return trace_dict.get("trace_id") or trace_dict.get("replay_id") or trace_dict.get("original_job_id")
+
+
 def load_traces(traces_file: Path) -> dict:
     """Load traces from JSONL file."""
     traces = {}
@@ -31,7 +35,7 @@ def load_traces(traces_file: Path) -> dict:
         for line in f:
             if line.strip():
                 trace_dict = json.loads(line)
-                trace_id = trace_dict.get("replay_id") or trace_dict.get("original_job_id")
+                trace_id = get_trace_id(trace_dict)
                 traces[trace_id] = trace_dict
 
     logger.info(f"Loaded {len(traces)} traces from {traces_file}")
@@ -43,32 +47,32 @@ def validate_operation(replayer: ExecutionReplayer, trace_dict: dict) -> dict:
     # Convert dict to ReplayTrace (simplified)
     try:
         is_valid = (
-            trace_dict.get("replay_id") is not None
+            get_trace_id(trace_dict) is not None
             and trace_dict.get("agent_sequence") is not None
             and trace_dict.get("execution_path") is not None
         )
 
         if is_valid:
             logger.info(
-                f"Trace {trace_dict.get('replay_id')} is valid: {len(trace_dict.get('agent_sequence', []))} agents"
+                f"Trace {get_trace_id(trace_dict)} is valid: {len(trace_dict.get('agent_sequence', []))} agents"
             )
             return {
-                "trace_id": trace_dict.get("replay_id"),
+                "trace_id": get_trace_id(trace_dict),
                 "valid": True,
                 "agent_count": len(trace_dict.get("agent_sequence", [])),
                 "tool_call_count": len(trace_dict.get("tool_calls", [])),
             }
         else:
-            logger.warning(f"Trace {trace_dict.get('replay_id')} is missing required fields")
+            logger.warning(f"Trace {get_trace_id(trace_dict)} is missing required fields")
             return {
-                "trace_id": trace_dict.get("replay_id"),
+                "trace_id": get_trace_id(trace_dict),
                 "valid": False,
                 "reason": "missing required fields",
             }
     except Exception as e:
         logger.error(f"Validation failed: {e}")
         return {
-            "trace_id": trace_dict.get("replay_id"),
+            "trace_id": get_trace_id(trace_dict),
             "valid": False,
             "reason": str(e),
         }
@@ -83,8 +87,8 @@ def compare_operation(replayer: ExecutionReplayer, trace_dict: dict, baseline_di
         diverged = trace1_agents != trace2_agents
 
         result = {
-            "trace1_id": trace_dict.get("replay_id"),
-            "trace2_id": baseline_dict.get("replay_id"),
+            "trace1_id": get_trace_id(trace_dict),
+            "trace2_id": get_trace_id(baseline_dict),
             "diverged": diverged,
             "trace1_agents": len(trace1_agents),
             "trace2_agents": len(trace2_agents),

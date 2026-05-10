@@ -380,7 +380,7 @@ Every execution produces an immutable trace for replay and debugging.
 
 ```json
 {
-  "replay_id": "job_001",
+  "trace_id": "job_001",
   "original_job_id": "job_001",
   "query": "Compare PostgreSQL and Redis for caching workloads",
   "agent_sequence": [

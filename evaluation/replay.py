@@ -65,7 +65,7 @@ class ExecutionReplayer:
             ReplayTrace instance.
         """
         trace = ReplayTrace(
-            replay_id=original_job_id,
+            trace_id=original_job_id,
             original_job_id=original_job_id,
             correlation_id=original_job_id,
             query=query,
@@ -211,7 +211,7 @@ class ExecutionReplayer:
     def replay_summary(self, trace: ReplayTrace) -> Dict[str, Any]:
         """Return a compact replay verification summary."""
         return {
-            "trace_id": trace.replay_id,
+            "trace_id": trace.trace_id,
             "correlation_id": trace.correlation_id or trace.original_job_id,
             "execution_hash": trace.execution_hash,
             "agent_count": len(trace.agent_sequence),

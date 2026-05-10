@@ -235,7 +235,7 @@ PostgreSQL Database
 │  └─ timestamp
 │
 ├─ traces
-│  ├─ replay_id
+│  ├─ trace_id
 │  ├─ original_job_id
 │  ├─ agent_sequence (JSON array)
 │  ├─ tool_calls (JSON array)

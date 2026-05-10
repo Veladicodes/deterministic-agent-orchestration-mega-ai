@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import AliasChoices, BaseModel, Field, ConfigDict
 
 
 class FailureType(str, Enum):
@@ -130,8 +130,8 @@ class ReplayTrace(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    replay_id: str
-    """Unique replay identifier."""
+    trace_id: str = Field(validation_alias=AliasChoices("trace_id", "replay_id"))
+    """Unique trace identifier."""
 
     original_job_id: str
     """Original job being replayed."""
@@ -168,6 +168,12 @@ class ReplayTrace(BaseModel):
 
     replay_divergence: Optional[str] = None
     """Description of any divergence from original."""
+
+    @property
+    def replay_id(self) -> str:
+        """Compatibility alias for older callers and stored artifacts."""
+
+        return self.trace_id
 
 
 class EvaluationRunMetadata(BaseModel):
