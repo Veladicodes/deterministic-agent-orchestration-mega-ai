@@ -1,7 +1,10 @@
 from functools import lru_cache
 import os
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict
+
+load_dotenv()
 
 
 class Settings(BaseModel):
