@@ -1,0 +1,49 @@
+.venv
+venv
+ENV
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+htmlcov
+dist
+build
+.eggs
+*.egg-info
+pip-wheel-metadata
+
+# Docker
+docker-data
+postgres-data
+redis-data
+**/.dockerignore
+
+# IDEs
+.vscode
+.idea
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+logs
+*.log
+
+# Python env files
+.env
+.env.local
+
+# Notebooks
+.ipynb_checkpoints
+
+# Pytest cache
+.pytest_cache
+
+# mypy/ruff
+.mypy_cache
+.ruff_cache
+
+# OS
+.DS_Store
+Thumbs.db
