@@ -1,0 +1,826 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "dataset_id": "eval_dataset_v1_20260509",
+    "total_queries": 40,
+    "categories": [
+      "normal",
+      "ambiguous",
+      "adversarial",
+      "contradiction_prone",
+      "provenance_sensitive"
+    ],
+    "created": "2026-05-09",
+    "notes": "Deterministic behavioral evaluation dataset. NOT designed for exact-match validation. Focus: execution observability, reproducibility, failure modes."
+  },
+  "evaluation_entries": [
+    {
+      "query_id": "normal_001",
+      "category": "normal",
+      "input_query": "What is machine learning?",
+      "expected_decomposition_characteristics": [
+        "single_intent_definition",
+        "clear_domain",
+        "no_pronouns"
+      ],
+      "expected_provenance_requirements": [
+        "multiple_sources",
+        "varying_specificity"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Straightforward definitional query. Should decompose to single or dual sub-tasks. Provenance should be broad ML sources."
+    },
+    {
+      "query_id": "normal_002",
+      "category": "normal",
+      "input_query": "Explain neural networks and deep learning",
+      "expected_decomposition_characteristics": [
+        "dual_intent",
+        "entity_clarification",
+        "relationship_inference"
+      ],
+      "expected_provenance_requirements": [
+        "technical_sources",
+        "multiple_perspectives"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Two related concepts with implied relationship. Should decompose to explain neural networks AND explain deep learning OR relationship."
+    },
+    {
+      "query_id": "normal_003",
+      "category": "normal",
+      "input_query": "How does artificial intelligence impact healthcare?",
+      "expected_decomposition_characteristics": [
+        "domain_specific",
+        "causality_inference",
+        "scope_detection"
+      ],
+      "expected_provenance_requirements": [
+        "healthcare_domain",
+        "industry_sources",
+        "case_studies"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Domain-specific impact query. Should generate sub-tasks around specific healthcare applications."
+    },
+    {
+      "query_id": "normal_004",
+      "category": "normal",
+      "input_query": "What are the main types of machine learning algorithms?",
+      "expected_decomposition_characteristics": [
+        "classification_intent",
+        "list_intent",
+        "clear_scope"
+      ],
+      "expected_provenance_requirements": [
+        "categorical_sources",
+        "comprehensive_coverage"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Taxonomy query. Should decompose to supervised/unsupervised/reinforcement breakdown."
+    },
+    {
+      "query_id": "normal_005",
+      "category": "normal",
+      "input_query": "Describe the steps in a machine learning pipeline",
+      "expected_decomposition_characteristics": [
+        "sequential_intent",
+        "process_decomposition",
+        "no_ambiguity"
+      ],
+      "expected_provenance_requirements": [
+        "process_documentation",
+        "consistent_ordering"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Process/workflow query. Should decompose to stages: data collection, preprocessing, training, evaluation, deployment."
+    },
+    {
+      "query_id": "ambiguous_001",
+      "category": "ambiguous",
+      "input_query": "How does learning work?",
+      "expected_decomposition_characteristics": [
+        "vague_domain",
+        "multiple_interpretations",
+        "pronoun_reference"
+      ],
+      "expected_provenance_requirements": [
+        "educational_sources",
+        "cognitive_science",
+        "ml_context"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "retrieval_divergence"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Ambiguous query without domain context. Could mean: cognitive learning, ML learning, pedagogical learning. Should flag ambiguity."
+    },
+    {
+      "query_id": "ambiguous_002",
+      "category": "ambiguous",
+      "input_query": "Explain the model",
+      "expected_decomposition_characteristics": [
+        "vague_entity_reference",
+        "missing_context",
+        "pronoun_only"
+      ],
+      "expected_provenance_requirements": [
+        "impossible_to_determine",
+        "over_broad_retrieval"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "retrieval_failure_likely"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Critical information missing. 'model' is underspecified. Should flag as ambiguous."
+    },
+    {
+      "query_id": "ambiguous_003",
+      "category": "ambiguous",
+      "input_query": "What is the difference?",
+      "expected_decomposition_characteristics": [
+        "incomplete_comparison",
+        "missing_entities",
+        "vague_scope"
+      ],
+      "expected_provenance_requirements": [
+        "indeterminate"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "decomposition_failure_possible"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Comparison without subjects. Should flag as ambiguous."
+    },
+    {
+      "query_id": "ambiguous_004",
+      "category": "ambiguous",
+      "input_query": "Compare A and B in the context of their uses",
+      "expected_decomposition_characteristics": [
+        "placeholder_entities",
+        "context_reference_ambiguous",
+        "scope_unclear"
+      ],
+      "expected_provenance_requirements": [
+        "context_dependent"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "variable_interpretation"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Abstract entity reference (A and B). Should flag as ambiguous."
+    },
+    {
+      "query_id": "ambiguous_005",
+      "category": "ambiguous",
+      "input_query": "Tell me more",
+      "expected_decomposition_characteristics": [
+        "no_explicit_content",
+        "anaphora_only",
+        "context_dependent"
+      ],
+      "expected_provenance_requirements": [
+        "none_determinable"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "decomposition_failure_expected"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Continuation without context. Anaphoric reference only. Should flag heavily."
+    },
+    {
+      "query_id": "adversarial_001",
+      "category": "adversarial",
+      "input_query": "Is AI intelligent or is it just pattern matching?",
+      "expected_decomposition_characteristics": [
+        "leading_question",
+        "false_dichotomy",
+        "philosophical_framing"
+      ],
+      "expected_provenance_requirements": [
+        "definition_sources",
+        "philosophical_sources",
+        "technical_sources"
+      ],
+      "expected_failure_modes": [
+        "contradiction_heavy",
+        "opinion_bias_likely"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Loaded question with false binary. Should detect intent: question about nature of AI intelligence."
+    },
+    {
+      "query_id": "adversarial_002",
+      "category": "adversarial",
+      "input_query": "Why is machine learning obviously the best approach to all problems?",
+      "expected_decomposition_characteristics": [
+        "loaded_premise",
+        "universality_claim",
+        "bias_embedded"
+      ],
+      "expected_provenance_requirements": [
+        "counterexample_sources",
+        "nuanced_discussion"
+      ],
+      "expected_failure_modes": [
+        "premise_not_questioned",
+        "high_contradiction_potential"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "False universality claim. Should decompose neutrally without accepting premise."
+    },
+    {
+      "query_id": "adversarial_003",
+      "category": "adversarial",
+      "input_query": "Everyone agrees that AI will create massive unemployment, right?",
+      "expected_decomposition_characteristics": [
+        "false_consensus",
+        "leading_assertion",
+        "social_pressure"
+      ],
+      "expected_provenance_requirements": [
+        "contrarian_sources",
+        "nuanced_discussion",
+        "historical_context"
+      ],
+      "expected_failure_modes": [
+        "consensus_bias",
+        "high_contradiction_rate_expected"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "False consensus claim. Neutral decomposition should surface disagreement."
+    },
+    {
+      "query_id": "adversarial_004",
+      "category": "adversarial",
+      "input_query": "What secret do tech companies not want you to know about AI?",
+      "expected_decomposition_characteristics": [
+        "conspiracy_framing",
+        "unsubstantiated_claim",
+        "loaded_presupposition"
+      ],
+      "expected_provenance_requirements": [
+        "credible_sources_only",
+        "documented_evidence"
+      ],
+      "expected_failure_modes": [
+        "false_premise_acceptance",
+        "hallucination_risk_high"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Conspiracy presupposition. Neutral decomposition should avoid accepting premise."
+    },
+    {
+      "query_id": "adversarial_005",
+      "category": "adversarial",
+      "input_query": "Since deep learning is proven to be unsafe, what are the alternatives?",
+      "expected_decomposition_characteristics": [
+        "unproven_assertion",
+        "embedded_conclusion",
+        "loaded_framing"
+      ],
+      "expected_provenance_requirements": [
+        "definition_of_safety",
+        "evidence_base",
+        "nuance"
+      ],
+      "expected_failure_modes": [
+        "premise_acceptance",
+        "contradiction_heavy"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Unproven claim embedded in question. Should decompose without accepting premise."
+    },
+    {
+      "query_id": "contradiction_001",
+      "category": "contradiction_prone",
+      "input_query": "Is supervised learning better than unsupervised learning or vice versa?",
+      "expected_decomposition_characteristics": [
+        "comparative_intent",
+        "domain_specific",
+        "context_dependent"
+      ],
+      "expected_provenance_requirements": [
+        "use_case_documentation",
+        "tradeoff_analysis",
+        "contextual_comparisons"
+      ],
+      "expected_failure_modes": [
+        "false_universal_comparison",
+        "high_contradiction_expected"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate_expected",
+      "evaluation_notes": "Comparative question without context. Sources will contradict on which is 'better' depending on use case."
+    },
+    {
+      "query_id": "contradiction_002",
+      "category": "contradiction_prone",
+      "input_query": "Are transformers or RNNs more important for NLP?",
+      "expected_decomposition_characteristics": [
+        "technical_comparison",
+        "importance_claim",
+        "temporal_variability"
+      ],
+      "expected_provenance_requirements": [
+        "temporal_sources",
+        "research_papers",
+        "industry_practices"
+      ],
+      "expected_failure_modes": [
+        "temporal_contradiction",
+        "research_vs_practice_gap"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate_expected",
+      "evaluation_notes": "Technical comparison where importance evolved over time. Recent sources: transformers dominant. Earlier sources: RNNs were sota."
+    },
+    {
+      "query_id": "contradiction_003",
+      "category": "contradiction_prone",
+      "input_query": "Should you use batch normalization in your neural networks?",
+      "expected_decomposition_characteristics": [
+        "best_practice_question",
+        "context_dependent",
+        "practice_variability"
+      ],
+      "expected_provenance_requirements": [
+        "research_papers",
+        "best_practices",
+        "use_case_studies"
+      ],
+      "expected_failure_modes": [
+        "false_universal_best_practice",
+        "medium_contradiction_expected"
+      ],
+      "expected_contradiction_behavior": "medium_contradiction_rate",
+      "evaluation_notes": "Best practice question with context-dependent answer. Should find sources recommending AND warning against batch norm."
+    },
+    {
+      "query_id": "contradiction_004",
+      "category": "contradiction_prone",
+      "input_query": "Is gradient descent the best optimization algorithm?",
+      "expected_decomposition_characteristics": [
+        "optimization_comparison",
+        "universality_claim",
+        "context_dependent"
+      ],
+      "expected_provenance_requirements": [
+        "algorithm_documentation",
+        "comparative_analysis",
+        "use_case_studies"
+      ],
+      "expected_failure_modes": [
+        "false_universality",
+        "high_contradiction_expected"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate_expected",
+      "evaluation_notes": "Universal claim about algorithm choice. Sources will vary on which is 'best' based on problem domain."
+    },
+    {
+      "query_id": "contradiction_005",
+      "category": "contradiction_prone",
+      "input_query": "Will artificial intelligence replace human workers?",
+      "expected_decomposition_characteristics": [
+        "prognostication",
+        "economic_impact",
+        "multiple_perspectives"
+      ],
+      "expected_provenance_requirements": [
+        "economist_perspectives",
+        "technologist_perspectives",
+        "historical_precedent"
+      ],
+      "expected_failure_modes": [
+        "opinion_divergence",
+        "very_high_contradiction_rate"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Prognostication query with high disagreement. Will find optimistic AND pessimistic sources."
+    },
+    {
+      "query_id": "provenance_001",
+      "category": "provenance_sensitive",
+      "input_query": "What did the 2017 AlexNet paper say about convolutional neural networks?",
+      "expected_decomposition_characteristics": [
+        "specific_source_reference",
+        "entity_identification",
+        "date_specific"
+      ],
+      "expected_provenance_requirements": [
+        "specific_paper_citation",
+        "date_accuracy",
+        "claim_attribution"
+      ],
+      "expected_failure_modes": [
+        "temporal_confabulation",
+        "paper_misattribution",
+        "date_error"
+      ],
+      "expected_contradiction_behavior": "medium_contradiction_rate",
+      "evaluation_notes": "Specific paper reference (AlexNet is 2012, not 2017). Should detect date discrepancy or flag as ambiguous."
+    },
+    {
+      "query_id": "provenance_002",
+      "category": "provenance_sensitive",
+      "input_query": "Which MNIST benchmark achieved 99.8% accuracy first?",
+      "expected_decomposition_characteristics": [
+        "specific_benchmark",
+        "record_seeking",
+        "temporal_ranking"
+      ],
+      "expected_provenance_requirements": [
+        "specific_citation",
+        "temporal_accuracy",
+        "benchmark_context"
+      ],
+      "expected_failure_modes": [
+        "temporal_error",
+        "source_misattribution",
+        "context_loss"
+      ],
+      "expected_contradiction_behavior": "medium_contradiction_rate",
+      "evaluation_notes": "Very specific benchmark claim. Provenance must be attributed correctly with dates."
+    },
+    {
+      "query_id": "provenance_003",
+      "category": "provenance_sensitive",
+      "input_query": "What are the limitations of backpropagation according to Hinton?",
+      "expected_decomposition_characteristics": [
+        "researcher_attribution",
+        "specific_opinion",
+        "technical_claim"
+      ],
+      "expected_provenance_requirements": [
+        "researcher_specific_sources",
+        "attribution_accuracy",
+        "quote_context"
+      ],
+      "expected_failure_modes": [
+        "misattribution",
+        "context_loss",
+        "quote_misuse"
+      ],
+      "expected_contradiction_behavior": "medium_contradiction_rate",
+      "evaluation_notes": "Researcher-specific claim. Must find actual Hinton statements, not paraphrases or indirect attribution."
+    },
+    {
+      "query_id": "provenance_004",
+      "category": "provenance_sensitive",
+      "input_query": "According to recent research, how much data does a transformer need to train effectively?",
+      "expected_decomposition_characteristics": [
+        "research_recency_requirement",
+        "quantitative_claim",
+        "research_context"
+      ],
+      "expected_provenance_requirements": [
+        "recent_papers_preferred",
+        "specific_datasets",
+        "quantitative_accuracy"
+      ],
+      "expected_failure_modes": [
+        "temporal_outdatedness",
+        "approximation_errors",
+        "context_loss"
+      ],
+      "expected_contradiction_behavior": "medium_contradiction_rate",
+      "evaluation_notes": "'Recent research' signal should filter for newer sources. Different papers will have different answers."
+    },
+    {
+      "query_id": "provenance_005",
+      "category": "provenance_sensitive",
+      "input_query": "What is the cite rate of the ResNet paper in computer vision research?",
+      "expected_decomposition_characteristics": [
+        "bibliometric_query",
+        "specific_resource",
+        "quantitative_claim"
+      ],
+      "expected_provenance_requirements": [
+        "citation_index_sources",
+        "temporal_accuracy",
+        "source_authority"
+      ],
+      "expected_failure_modes": [
+        "citation_count_variability",
+        "source_conflict",
+        "temporal_sensitivity"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate_but_variation",
+      "evaluation_notes": "Citation counts vary by source (Google Scholar, Semantic Scholar, etc.). Should note variability."
+    },
+    {
+      "query_id": "normal_006",
+      "category": "normal",
+      "input_query": "What are common challenges in deploying machine learning models to production?",
+      "expected_decomposition_characteristics": [
+        "challenge_enumeration",
+        "domain_specific",
+        "operational_focus"
+      ],
+      "expected_provenance_requirements": [
+        "industry_sources",
+        "operational_documentation",
+        "case_studies"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Operational query with well-documented challenges. Should find consistent themes."
+    },
+    {
+      "query_id": "normal_007",
+      "category": "normal",
+      "input_query": "How does regularization prevent overfitting in machine learning?",
+      "expected_decomposition_characteristics": [
+        "mechanism_explanation",
+        "causal_reasoning",
+        "technical_detail"
+      ],
+      "expected_provenance_requirements": [
+        "technical_papers",
+        "textbooks",
+        "tutorials"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Well-understood technical concept. Should find consistent explanation."
+    },
+    {
+      "query_id": "normal_008",
+      "category": "normal",
+      "input_query": "What is the difference between training loss and validation loss?",
+      "expected_decomposition_characteristics": [
+        "concept_comparison",
+        "clear_scope",
+        "definitional"
+      ],
+      "expected_provenance_requirements": [
+        "educational_sources",
+        "documentation",
+        "tutorial_sources"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Standard machine learning concept. Should find consistent definition."
+    },
+    {
+      "query_id": "normal_009",
+      "category": "normal",
+      "input_query": "What are hyperparameters in machine learning?",
+      "expected_decomposition_characteristics": [
+        "concept_definition",
+        "single_entity",
+        "no_ambiguity"
+      ],
+      "expected_provenance_requirements": [
+        "definitions",
+        "examples",
+        "best_practices"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Standard definition query. Should find consistent explanation."
+    },
+    {
+      "query_id": "normal_010",
+      "category": "normal",
+      "input_query": "How do you evaluate a machine learning model?",
+      "expected_decomposition_characteristics": [
+        "process_description",
+        "methodology",
+        "multi_stage"
+      ],
+      "expected_provenance_requirements": [
+        "methodology_sources",
+        "best_practices",
+        "metric_documentation"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Well-established methodology. Should find consistent best practices."
+    },
+    {
+      "query_id": "ambiguous_006",
+      "category": "ambiguous",
+      "input_query": "How can we improve it?",
+      "expected_decomposition_characteristics": [
+        "anaphora_only",
+        "no_antecedent",
+        "context_required"
+      ],
+      "expected_provenance_requirements": [
+        "indeterminate"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "decomposition_failure_likely"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Anaphoric reference without context. Should flag as ambiguous."
+    },
+    {
+      "query_id": "ambiguous_007",
+      "category": "ambiguous",
+      "input_query": "Why does it fail sometimes?",
+      "expected_decomposition_characteristics": [
+        "vague_reference",
+        "anaphora",
+        "missing_context"
+      ],
+      "expected_provenance_requirements": [
+        "indeterminate"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "retrieval_failure_likely"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Anaphoric reference with no prior context. Should flag heavily."
+    },
+    {
+      "query_id": "ambiguous_008",
+      "category": "ambiguous",
+      "input_query": "Is it true that it's the best one?",
+      "expected_decomposition_characteristics": [
+        "multiple_vague_references",
+        "no_context",
+        "anaphora_only"
+      ],
+      "expected_provenance_requirements": [
+        "none_determinable"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "decomposition_failure_likely"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Multiple anaphoric references with no grounding. Critical ambiguity."
+    },
+    {
+      "query_id": "ambiguous_009",
+      "category": "ambiguous",
+      "input_query": "Should I use the new approach or the old one?",
+      "expected_decomposition_characteristics": [
+        "temporal_vagueness",
+        "entity_underspecified",
+        "domain_missing"
+      ],
+      "expected_provenance_requirements": [
+        "context_required"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "retrieval_divergence"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Approach underspecified. No domain context. Should flag as ambiguous."
+    },
+    {
+      "query_id": "ambiguous_010",
+      "category": "ambiguous",
+      "input_query": "Does that relate to this?",
+      "expected_decomposition_characteristics": [
+        "anaphora_only",
+        "no_grounding",
+        "complete_context_loss"
+      ],
+      "expected_provenance_requirements": [
+        "none_determinable"
+      ],
+      "expected_failure_modes": [
+        "ambiguity_flag_raised",
+        "decomposition_failure_likely"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Completely anaphoric question. No recoverable meaning. Should flag as critical ambiguity."
+    },
+    {
+      "query_id": "adversarial_006",
+      "category": "adversarial",
+      "input_query": "Isn't it obvious that neural networks are just glorified linear models?",
+      "expected_decomposition_characteristics": [
+        "leading_assertion",
+        "false_equivalence",
+        "dismissive_framing"
+      ],
+      "expected_provenance_requirements": [
+        "technical_depth",
+        "nuanced_sources"
+      ],
+      "expected_failure_modes": [
+        "assertion_acceptance",
+        "high_contradiction_rate"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "False equivalence with dismissive framing. Should decompose to examine what's unique about neural networks."
+    },
+    {
+      "query_id": "adversarial_007",
+      "category": "adversarial",
+      "input_query": "Given that LLMs are destroying the planet, what are the environmental alternatives?",
+      "expected_decomposition_characteristics": [
+        "loaded_premise",
+        "causal_claim",
+        "environmental_framing"
+      ],
+      "expected_provenance_requirements": [
+        "environmental_impact_sources",
+        "evidence_base",
+        "nuanced_discussion"
+      ],
+      "expected_failure_modes": [
+        "premise_acceptance",
+        "very_high_contradiction_rate"
+      ],
+      "expected_contradiction_behavior": "very_high_contradiction_rate",
+      "evaluation_notes": "Loaded environmental claim. Should decompose without accepting 'destroying planet' premise."
+    },
+    {
+      "query_id": "adversarial_008",
+      "category": "adversarial",
+      "input_query": "Why do machine learning researchers ignore the obvious solution?",
+      "expected_decomposition_characteristics": [
+        "presupposition_of_incompetence",
+        "loaded_question",
+        "rhetorical_attack"
+      ],
+      "expected_provenance_requirements": [
+        "credible_technical_sources"
+      ],
+      "expected_failure_modes": [
+        "presupposition_acceptance",
+        "high_contradiction_rate"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Rhetorical attack presupposing incompetence. Should decompose neutrally."
+    },
+    {
+      "query_id": "adversarial_009",
+      "category": "adversarial",
+      "input_query": "Isn't it unethical to use algorithms that obviously discriminate?",
+      "expected_decomposition_characteristics": [
+        "loaded_premise",
+        "moral_claim",
+        "causal_assertion"
+      ],
+      "expected_provenance_requirements": [
+        "ethics_sources",
+        "evidence_base",
+        "nuanced_discussion"
+      ],
+      "expected_failure_modes": [
+        "premise_acceptance",
+        "high_contradiction_rate"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Moral claim with embedded false certainty. Should decompose on discrimination mechanisms, not premise."
+    },
+    {
+      "query_id": "adversarial_010",
+      "category": "adversarial",
+      "input_query": "Don't you agree that the current approach is fundamentally flawed?",
+      "expected_decomposition_characteristics": [
+        "consensus_seeking",
+        "presupposed_flaw",
+        "social_pressure"
+      ],
+      "expected_provenance_requirements": [
+        "criticism_sources",
+        "defense_sources"
+      ],
+      "expected_failure_modes": [
+        "agreement_seeking",
+        "high_contradiction_rate"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Consensus-seeking question presupposing flaw. Should decompose neutrally."
+    }
+  ]
+}
