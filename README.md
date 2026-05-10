@@ -326,7 +326,7 @@ See [api/](api/) for FastAPI application.
 python -m api.main
 
 # Health check
-curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/health
 ```
 
 ## Testing

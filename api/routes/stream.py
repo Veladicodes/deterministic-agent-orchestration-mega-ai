@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from orchestration.pipeline import PipelineRunner
 
-router = APIRouter(prefix="/v1", tags=["stream"])
+router = APIRouter(tags=["stream"])
 
 
 def _sse_format(event: dict) -> str:
