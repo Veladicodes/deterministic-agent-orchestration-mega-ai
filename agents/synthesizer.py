@@ -6,6 +6,7 @@ preserves provenance, and produces the final answer.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from shared.agent_base import BaseAgent
@@ -36,6 +37,11 @@ class SynthesizerAgent(BaseAgent):
         """
         self._logger.info("synthesizing final answer from %d agent outputs", len(shared_context.agent_outputs))
 
+        # Exposed so a subclass's `_synthesize_claims` override (e.g.
+        # LLMSynthesizerAgent) can append its own ToolCallRecord to the
+        # shared context without changing this method's signature.
+        self._current_context = shared_context
+
         # Extract prior agent outputs
         retrieved_output = self._extract_output_by_agent_type(shared_context, "retriever")
         critique_output = self._extract_output_by_agent_type(shared_context, "critic")
@@ -63,8 +69,14 @@ class SynthesizerAgent(BaseAgent):
                             metadata=record.get("metadata", {}),
                         )
 
-        # Build final answer by combining claims
+        # Build final answer by combining claims. `_synthesize_claims` is
+        # sync by default (deterministic string concatenation); subclasses
+        # such as LLMSynthesizerAgent may override it with an async method
+        # that calls out to a real LLM tool, so we transparently await
+        # awaitable results here without changing the base contract.
         final_answer = self._synthesize_claims(claim_pool, retrieved_results)
+        if inspect.isawaitable(final_answer):
+            final_answer = await final_answer
 
         # Calculate confidence based on evidence
         sources_used = len(set(r.get("source_url", "") for r in retrieved_results)) if retrieved_results else 0

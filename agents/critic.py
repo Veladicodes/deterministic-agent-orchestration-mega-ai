@@ -7,11 +7,12 @@ structured critique records.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
 from shared.agent_base import BaseAgent
 from context.shared_context import SharedContext
 from agents.schemas import CritiqueOutput, CritiqueRecord, ConfidenceScore
+from agents.contradiction_rules import KEYWORD_CONTRADICTIONS, detect_contradiction
 
 
 class CriticAgent(BaseAgent):
@@ -24,18 +25,19 @@ class CriticAgent(BaseAgent):
     4. Assess confidence of claims based on evidence and consensus
     5. Flag low-confidence or contradictory claims for removal
     6. Produce structured CritiqueOutput
+
+    Contradiction detection runs three deterministic, independently
+    testable rule tiers (see agents/contradiction_rules.py): fixed
+    antonym-pair keywords, numeric-claim divergence (e.g. "accuracy is
+    76%" vs "82%"), and negation-aware shared-keyword matching. Each
+    detector returns structured evidence so every flagged contradiction
+    carries a human-readable justification — this stays fully explainable
+    without needing an LLM judge.
     """
 
-    # Contradiction indicators (simple text matching for determinism)
-    CONTRADICTION_KEYWORDS = {
-        ("yes", "no"),
-        ("true", "false"),
-        ("agree", "disagree"),
-        ("support", "oppose"),
-        ("increase", "decrease"),
-        ("positive", "negative"),
-        ("good", "bad"),
-    }
+    # Kept for backward compatibility with any external references;
+    # canonical definition now lives in agents/contradiction_rules.py.
+    CONTRADICTION_KEYWORDS = KEYWORD_CONTRADICTIONS
 
     # Confidence threshold below which claims are flagged
     LOW_CONFIDENCE_THRESHOLD = 0.5
@@ -154,79 +156,80 @@ class CriticAgent(BaseAgent):
 
         return output
 
+    def _evidence_to_details(self, evidence: Dict[str, object], label_a: str, label_b: str) -> str:
+        """Render a rule-tier evidence dict into a human-readable justification."""
+        rule = evidence.get("rule")
+        if rule == "keyword_pair":
+            return f"{label_a} says '{evidence['keyword_a']}' but {label_b} says '{evidence['keyword_b']}'"
+        if rule == "numeric_divergence":
+            return (
+                f"Conflicting numeric claims about '{evidence['subject']}': "
+                f"{label_a} states {evidence['value_a']:g}%, {label_b} states {evidence['value_b']:g}% "
+                f"(divergence {evidence['divergence']:g} points)"
+            )
+        if rule == "negation":
+            return f"'{evidence['keyword']}' is asserted in one output and negated in the other"
+        return "Contradiction detected"
+
     def _detect_same_agent_contradiction(self, output1: Any, output2: Any) -> CritiqueRecord | None:
         """Detect contradiction between two outputs from the same agent.
+
+        Runs the deterministic rule tiers in agents/contradiction_rules.py
+        (keyword-pair, numeric-divergence, negation-aware).
 
         Returns:
             CritiqueRecord if contradiction found, else None.
         """
-        text1 = (output1.output_text or "").lower()
-        text2 = (output2.output_text or "").lower()
+        text1 = output1.output_text or ""
+        text2 = output2.output_text or ""
 
-        # Check for explicit contradiction keywords
-        for keyword1, keyword2 in self.CONTRADICTION_KEYWORDS:
-            if keyword1 in text1 and keyword2 in text2:
-                critique = CritiqueRecord(
-                    agent_id=output1.agent_id,
-                    claim_or_output=output1.output_text or "<<empty>>",
-                    critique_type="contradiction",
-                    severity=0.8,
-                    confidence=ConfidenceScore(
-                        score=0.9,
-                        reasoning=f"Detected '{keyword1}' vs '{keyword2}' contradiction",
-                    ),
-                    details=f"Agent produced conflicting outputs: '{keyword1}' vs '{keyword2}'",
-                    related_claims=[output2.output_text or ""],
-                    flagged=True,
-                )
-                return critique
+        evidence = detect_contradiction(text1, text2)
+        if not evidence:
+            return None
 
-            if keyword1 in text2 and keyword2 in text1:
-                critique = CritiqueRecord(
-                    agent_id=output1.agent_id,
-                    claim_or_output=output1.output_text or "<<empty>>",
-                    critique_type="contradiction",
-                    severity=0.8,
-                    confidence=ConfidenceScore(
-                        score=0.9,
-                        reasoning=f"Detected '{keyword2}' vs '{keyword1}' contradiction",
-                    ),
-                    details=f"Agent produced conflicting outputs: '{keyword2}' vs '{keyword1}'",
-                    related_claims=[output2.output_text or ""],
-                    flagged=True,
-                )
-                return critique
-
-        return None
+        return CritiqueRecord(
+            agent_id=output1.agent_id,
+            claim_or_output=output1.output_text or "<<empty>>",
+            critique_type="contradiction",
+            severity=0.8,
+            confidence=ConfidenceScore(
+                score=0.9,
+                reasoning=f"Detected via rule '{evidence.get('rule')}'",
+            ),
+            details=self._evidence_to_details(evidence, output1.agent_id, output2.agent_id),
+            related_claims=[output2.output_text or ""],
+            flagged=True,
+        )
 
     def _detect_cross_agent_contradiction(self, output1: Any, output2: Any) -> CritiqueRecord | None:
         """Detect contradiction between outputs from different agents.
 
+        Runs the same deterministic rule tiers as same-agent detection,
+        applied across agent boundaries.
+
         Returns:
             CritiqueRecord if contradiction found, else None.
         """
-        text1 = (output1.output_text or "").lower()
-        text2 = (output2.output_text or "").lower()
+        text1 = output1.output_text or ""
+        text2 = output2.output_text or ""
 
-        # Check for explicit contradiction keywords between different sources
-        for keyword1, keyword2 in self.CONTRADICTION_KEYWORDS:
-            if keyword1 in text1 and keyword2 in text2:
-                critique = CritiqueRecord(
-                    agent_id=output1.agent_id,
-                    claim_or_output=output1.output_text or "<<empty>>",
-                    critique_type="contradiction",
-                    severity=0.7,
-                    confidence=ConfidenceScore(
-                        score=0.8,
-                        reasoning=f"Cross-agent disagreement: '{keyword1}' vs '{keyword2}'",
-                    ),
-                    details=f"{output1.agent_id} says '{keyword1}' but {output2.agent_id} says '{keyword2}'",
-                    related_claims=[output2.output_text or ""],
-                    flagged=True,
-                )
-                return critique
+        evidence = detect_contradiction(text1, text2)
+        if not evidence:
+            return None
 
-        return None
+        return CritiqueRecord(
+            agent_id=output1.agent_id,
+            claim_or_output=output1.output_text or "<<empty>>",
+            critique_type="contradiction",
+            severity=0.7,
+            confidence=ConfidenceScore(
+                score=0.8,
+                reasoning=f"Cross-agent disagreement via rule '{evidence.get('rule')}'",
+            ),
+            details=self._evidence_to_details(evidence, output1.agent_id, output2.agent_id),
+            related_claims=[output2.output_text or ""],
+            flagged=True,
+        )
 
     def _assess_confidence(self, output: Any, shared_context: SharedContext) -> ConfidenceScore:
         """Assess the confidence of an output based on evidence signals.
