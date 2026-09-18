@@ -176,6 +176,38 @@ RUNNING
 | 2-hop retrieval | Balanced coverage, traceable | May miss deep context |
 | Keyword contradiction detection | Deterministic, fast | False positives/negatives |
 
+## Pluggable Backends and the Determinism Boundary
+
+Real backends exist for two of the four agents (`tools/real_web_search_tool.py` for the Retriever, `agents/llm_synthesizer.py` / `tools/llm_tool.py` for the Synthesizer — see README's "Real Backends" section). Both are opt-in via `Settings.use_real_backends` and are selected in `orchestration/pipeline.py`'s `_build_web_search_tool()` / `_build_synthesizer_agent()`; the deterministic stub path remains the default with no configuration required.
+
+This raises the obvious question: **if a tool call can now hit a real, non-deterministic API, in what sense is the system still "deterministic"?**
+
+### What stays deterministic, always
+
+Regardless of which backend is selected:
+
+- **Decomposer** — always rule-based regex/heuristic decomposition. Never swapped for an LLM.
+- **Orchestration control flow** (`orchestration/pipeline.py`) — the fixed agent sequence, the routing heuristics (`_query_is_self_contained`, `_should_skip_critic`, `_contradiction_probability`, adversarial detection), and which agents get invoked or skipped. These depend only on the query text and prior deterministic agent outputs, never on a real backend's response content.
+- **Retry/backoff behavior** (`orchestration/retry_coordinator.py`, `shared/tool_base.py`'s `execute_with_retry`) — fixed policy, same for stub and real tools.
+- **Budget/cost accounting** (`shared/budget.py`) — reads `ToolResult.result["tokens"]` the same way regardless of which tool produced it; a real `LLMTool` call is tracked with the exact same code path as the stub.
+- **Critic's contradiction rules** (`agents/contradiction_rules.py`) — always deterministic rule tiers (keyword, numeric-divergence, negation), applied identically to stub or real Retriever/Synthesizer output.
+
+### What becomes non-deterministic, only when opted in
+
+- **Retriever's search results** — `RealWebSearchTool` calls a live search API; the same query can return different results on different days (or even different runs, if the underlying index changes).
+- **Synthesizer's prose** — `LLMSynthesizerAgent` calls a live LLM API; sampling means the exact wording can differ run to run even for identical input claims.
+
+### How replay/hashing handles this
+
+`evaluation/replay.py`'s `ExecutionReplayer` and the `/api/v1/query/run` + `/api/v1/replay/compare` API routes (`api/routes/query.py`, `api/routes/replay.py`) hash a **sanitized snapshot** of each run: query, agent sequence, tool-call *outcomes* (tool name, success, retry count, structured output), and routing decisions — deliberately excluding wall-clock fields (`latency_ms`, decision `timestamp`s) that vary run to run even under the fully deterministic stub path. This was a real bug caught and fixed while building the replay/diff feature: without sanitization, even two stub-mode runs of the same query never hashed identically, which would have made "replay proves determinism" meaningless.
+
+Given that sanitization, the practical behavior is:
+
+- **Stub backend**: two runs of the same query produce **identical** `execution_hash` values — same routing decisions, same tool outcomes, same content. This is checkable directly: run the same query twice through `/api/v1/query/run` and diff the hashes, or use the frontend's Replay/Diff tab.
+- **Real backend**: two runs of the same query will generally produce **different** `execution_hash` values, because the sanitized snapshot still includes tool *output content* (search results, LLM text), which genuinely varies. The routing decisions and agent sequence will typically still match (since those depend on query text and deterministic upstream signals, not on retrieved content) — so a real-backend divergence report will usually show identical `agent_sequence` but different tool-call outputs, which is itself informative: it isolates *which* layer is non-deterministic rather than reporting the whole run as an opaque mismatch.
+
+In short: **determinism is a property of the orchestrator, not a property every tool is forced to have.** The pipeline still fully traces, retries, budgets, and can replay-diff a non-deterministic tool call — it just won't report two such calls as identical, which is the correct behavior, not a limitation of the replay system.
+
 ## Configuration & Deployment
 
 ### Environment

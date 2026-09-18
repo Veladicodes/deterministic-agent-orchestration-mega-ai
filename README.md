@@ -4,7 +4,7 @@ A deterministic, operationally credible orchestration framework for multi-agent 
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-green)
-![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-122%20passing-brightgreen)
 ![Execution](https://img.shields.io/badge/execution-deterministic-orange)
 ![Replay](https://img.shields.io/badge/replay-validated-blueviolet)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -79,7 +79,7 @@ pytest -q
 Expected output:
 
 ```text
-82 passed
+122 passed
 ```
 
 ---
@@ -176,17 +176,23 @@ tests/           # deterministic test suite
 ## Architecture Diagram
 
 ```text
-Query
- ↓
-Decomposer
- ↓
-Retriever (conditional)
- ↓
-Critic (conditional)
- ↓
-Synthesizer
- ↓
-Replay + Evaluation + Trace Persistence
+Frontend (React/Vite, optional)          scripts/run_evaluation.py --backend stub|real
+        │  fetch/SSE                                  │
+        ▼                                              ▼
+   FastAPI (api/) ──────────────────────────► PipelineRunner
+        │  /query/run, /query/stream,                  │
+        │  /replay/compare, /health                    ▼
+        │                                    Decomposer (always deterministic)
+        │                                               │
+        │                                    Retriever (conditional; stub or RealWebSearchTool)
+        │                                               │
+        │                                    Critic (conditional; deterministic rule tiers)
+        │                                               │
+        │                                    Synthesizer (deterministic, or LLMSynthesizerAgent)
+        │                                               │
+        ▼                                               ▼
+   Postgres + Redis  ◄──────────────  Replay + Evaluation + Trace Persistence
+   (docker-compose.yml; Railway/Render in production — see docs/DEPLOYMENT.md)
 ```
 
 ## Example Command Payload
@@ -318,10 +324,10 @@ All execution is traced and persisted for replay and evaluation.
 
 | Metric | Result |
 |---|---|
-| Queries Evaluated | 40 |
+| Queries Evaluated | 44 |
 | Replay Validation | Pass |
-| Provenance Coverage | 100% |
-| Tests Passing | 81 |
+| Provenance Coverage | 90.9% |
+| Tests Passing | 122 |
 | Deterministic Replay | Verified |
 
 ![Evaluation snapshot](docs/evaluation_snapshot.svg)
@@ -342,7 +348,7 @@ make up                 # Start database and services
 make migrate            # Run migrations
 
 # 2. Validate
-make test               # Run 81 tests (all passing)
+make test               # Run 122 tests (all passing)
 
 # 3. Evaluate
 python scripts/run_evaluation.py \
@@ -381,7 +387,7 @@ python scripts/generate_report.py \
 ### Run Tests
 
 ```bash
-make test               # All 81 tests
+make test               # All 122 tests
 make test-agents        # Agent tests only
 make test-eval          # Evaluation tests only
 ```
@@ -391,7 +397,7 @@ make test-eval          # Evaluation tests only
 This system includes a **behavioral evaluation framework** that avoids exact-match validation:
 
 ### Dataset
-- **40 queries** across 5 categories (normal, ambiguous, adversarial, contradiction-prone, provenance-sensitive)
+- **44 queries** across 5 categories (normal, ambiguous, adversarial, contradiction-prone, provenance-sensitive)
 - **Behavioral expectations** (not exact answers)
 - **Curated for realistic challenges**
 
@@ -410,7 +416,7 @@ This system includes a **behavioral evaluation framework** that avoids exact-mat
 - Markdown reports with tables
 - Failure analysis and weak areas identification
 
-The current local benchmark run completes all 40 queries, produces replayable traces, and validates trace integrity. It is a system-behavior check, not a measure of semantic search quality.
+The current local benchmark run completes all 44 queries, produces replayable traces, and validates trace integrity. It is a system-behavior check, not a measure of semantic search quality.
 
 Full details: [EVALUATION.md](EVALUATION.md), [BENCHMARKS.md](BENCHMARKS.md)
 
@@ -489,19 +495,20 @@ If a tool times out or returns malformed data, retry logic is at orchestration l
 
 ```
 mega-ai/
-├── agents/                 # Agent implementations (Decomposer, Retriever, Critic, Synthesizer)
-├── api/                    # FastAPI HTTP layer
+├── agents/                 # Agent implementations (Decomposer, Retriever, Critic, Synthesizer, contradiction_rules, llm_synthesizer)
+├── api/                    # FastAPI HTTP layer (health, stream, query, replay routes; CORS/rate-limit middleware)
 ├── context/                # Shared context and data structures
-├── data/                   # evaluation_dataset.json (40 curated queries)
+├── data/                   # evaluation_dataset.json (44 curated queries)
 ├── db/                     # SQLAlchemy ORM, Alembic migrations
 ├── evaluation/             # Evaluation framework (metrics, failure analysis, replay, reporting)
+├── frontend/                # React + Vite + TypeScript + Tailwind demo UI
 ├── orchestration/          # ExecutionStateManager, PipelineRunner
 ├── shared/                 # Logging, configuration, utilities
-├── tools/                  # Retrieval, code execution, reflection tools
-├── tests/                  # 81 unit and integration tests
-├── scripts/                # CLI tools (run_evaluation, replay_query, generate_report)
+├── tools/                  # Retrieval, code execution, reflection, real search/LLM tools
+├── tests/                  # 122 unit and integration tests
+├── scripts/                # CLI tools (run_evaluation --backend stub|real, replay_query, generate_report)
 ├── notebooks/              # evaluation_eda.ipynb (analysis notebook)
-├── docs/                   # Architecture diagram, example walkthrough
+├── docs/                   # Architecture diagram, example walkthrough, SSE events, deployment guide
 ├── ARCHITECTURE.md         # Detailed system design
 ├── EVALUATION.md           # Evaluation philosophy and framework
 ├── BENCHMARKS.md           # Baseline results and known weaknesses
@@ -529,7 +536,7 @@ make migrate               # Run migrations
 ### 3. Run Tests
 
 ```bash
-pytest tests/ -v           # All 81 tests
+pytest tests/ -v           # All 122 tests
 ```
 
 ### 4. Run Evaluation
@@ -550,12 +557,53 @@ python -m api.main
 
 # Health check
 curl http://localhost:8000/api/v1/health
+
+# Run a query synchronously (full result + execution_hash)
+curl -X POST http://localhost:8000/api/v1/query/run \
+  -H "Content-Type: application/json" -d '{"query": "What is machine learning?"}'
+
+# Stream a query's pipeline events via SSE
+curl -N -X POST http://localhost:8000/api/v1/query/stream \
+  -H "Content-Type: application/json" -d '{"query": "What is machine learning?"}'
+
+# Compare two execution traces for divergence
+curl -X POST http://localhost:8000/api/v1/replay/compare \
+  -H "Content-Type: application/json" -d '{"trace_a": {...}, "trace_b": {...}}'
 ```
+
+See [docs/SSE_EVENTS.md](docs/SSE_EVENTS.md) for the streaming event vocabulary.
+
+## Frontend / Demo UI
+
+`frontend/` is a small React + Vite + TypeScript + Tailwind app that visualizes the actual thesis of this project — deterministic, replayable orchestration — rather than acting as a generic chatbot UI:
+
+- **Run tab**: submits a query, shows each pipeline stage (`decomposer` → `retriever` → `critic` → `synthesizer`) live via SSE as it runs or is skipped by routing, then the final answer with its provenance links and `execution_hash`.
+- **Replay/diff tab**: runs the same query twice and calls `/api/v1/replay/compare` (wrapping `evaluation/replay.py`) to prove the two runs made identical routing decisions and got identical results — the concrete, checkable evidence for the "deterministic orchestration" claim.
+
+```bash
+cd frontend
+cp .env.example .env   # VITE_API_BASE_URL defaults to http://localhost:8000/api/v1
+npm install
+npm run dev             # requires the API running locally (see above)
+```
+
+`npm run build` produces a static `dist/` bundle deployable to Vercel/Netlify/any static host; see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full backend+frontend deployment guide (not yet deployed live — that guide documents how to, honestly, rather than claiming a link that doesn't exist).
+
+## Real Backends (Optional)
+
+The deterministic stub tools (`tools/web_search.py`, the string-concatenation `SynthesizerAgent`) remain the default — reproducible, free, no API keys needed. Two real, opt-in backends exist behind the same agent/tool interfaces, selected via settings/env vars (see `.env.example`):
+
+| Backend | Tool | Enable with |
+|---|---|---|
+| Real web search (Tavily) | `tools/real_web_search_tool.py` | `USE_REAL_BACKENDS=true SEARCH_BACKEND=tavily SEARCH_API_KEY=...` |
+| LLM synthesis (Anthropic) | `tools/llm_tool.py` / `agents/llm_synthesizer.py` | `USE_REAL_BACKENDS=true SYNTHESIZER_BACKEND=llm ANTHROPIC_API_KEY=...` |
+
+The Decomposer and all orchestration/retry/replay logic stay deterministic regardless — only the Retriever's search results and the Synthesizer's prose become non-deterministic, and only when explicitly enabled. Run the evaluation suite against either configuration with `python scripts/run_evaluation.py --dataset data/evaluation_dataset.json --output results/ --backend stub|real`; see [BENCHMARKS.md](BENCHMARKS.md)'s "Real Backend Results" section for the reporting methodology.
 
 ## Testing
 
-- **81 tests** covering agents, orchestration, persistence, and evaluation
-- All tests deterministic and reproducible
+- **122 tests** covering agents, orchestration, persistence, evaluation, and the API/replay routes (2 additional opt-in `integration` tests are excluded by default and only run against live search/LLM API keys)
+- All default tests deterministic and reproducible
 - Test structure: `tests/test_<module>.py`
 
 ```bash
@@ -563,6 +611,7 @@ make test                  # Run all tests
 make test-agents           # Agent tests
 make test-orchestration    # Orchestration tests
 make test-eval             # Evaluation tests
+pytest -m integration      # Opt-in tests against live search/LLM APIs (requires API keys)
 ```
 
 ## Documentation
@@ -572,6 +621,8 @@ make test-eval             # Evaluation tests
 - **[BENCHMARKS.md](BENCHMARKS.md)**: Baseline results, known limitations, operational thresholds
 - **[docs/architecture_diagram.md](docs/architecture_diagram.md)**: Text diagrams
 - **[docs/example_pipeline_walkthrough.md](docs/example_pipeline_walkthrough.md)**: Full execution example
+- **[docs/SSE_EVENTS.md](docs/SSE_EVENTS.md)**: Streaming event vocabulary
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: Backend + frontend deployment guide
 
 ## Engineering Philosophy
 
@@ -581,8 +632,19 @@ This project embodies:
 ✅ **Reproducibility**: Deterministic execution enables replay  
 ✅ **Traceability**: Provenance linked to every claim  
 ✅ **Honesty**: Limitations documented, not hidden  
-✅ **Testability**: 81 tests, all passing  
+✅ **Testability**: 122 tests, all passing  
 ✅ **Simplicity**: No unnecessary abstractions  
+
+## Roadmap / What I'd Do Next
+
+Honest next steps, roughly in priority order:
+
+- **Token-level LLM streaming** — `/api/v1/query/stream` currently emits stage-level events (`agent_started`/`agent_completed`); `tools/llm_tool.py` returns one complete response rather than streaming tokens. Would need a streaming-specific method on the tool interface.
+- **Promote the Critic's semantic-similarity tier from "not built" to "built and evaluated"** — the numeric-divergence and negation-aware tiers in `agents/contradiction_rules.py` are deterministic rule-based additions; a further optional tier using a local (not API-based) sentence-embedding model to catch paraphrased contradictions was scoped but not built, to keep the rule set fully deterministic-by-inspection for the initial pass.
+- **A dedicated arXiv API integration** for provenance-sensitive academic queries, on top of the general-purpose `RealWebSearchTool` (Tavily) already added — would likely improve precision further for paper-lookup queries specifically (see BENCHMARKS.md's "Provenance Specificity" status note).
+- **Distributed rate limiting** — `api/middleware/rate_limit.py` is an in-memory, single-instance guard; a multi-instance deployment would need it backed by Redis (already in the stack) instead.
+- **A basic CI workflow** (`.github/workflows/test.yml`) running `pytest` on push — cheap, high-signal, added alongside this roadmap.
+- **Actually run `--backend real` against the evaluation dataset with live API keys** and publish the results in BENCHMARKS.md's "Real Backend Results" section, which currently documents methodology only (see that section for why no live numbers exist yet).
 
 ## What This Is Not
 
