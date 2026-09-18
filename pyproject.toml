@@ -13,3 +13,7 @@ packages = []
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "integration: hits a real external API; requires a live key, excluded by default",
+]
+addopts = "-m 'not integration'"

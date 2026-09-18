@@ -1,5 +1,6 @@
 from functools import lru_cache
 import os
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict
@@ -21,6 +22,15 @@ class Settings(BaseModel):
     celery_broker_url: str
     celery_result_backend: str
 
+    # Real backend configuration (opt-in). The deterministic stub tools
+    # remain the default so tests and reproducible/replayable runs are
+    # unaffected unless a caller explicitly selects a real backend.
+    use_real_backends: bool = False
+    search_backend: Literal["stub", "tavily"] = "stub"
+    search_api_key: Optional[str] = None
+    synthesizer_backend: Literal["deterministic", "llm"] = "deterministic"
+    anthropic_api_key: Optional[str] = None
+
     model_config = ConfigDict(extra="ignore")
 
     @classmethod
@@ -37,6 +47,11 @@ class Settings(BaseModel):
             "redis_url": os.getenv("REDIS_URL", ""),
             "celery_broker_url": os.getenv("CELERY_BROKER_URL", ""),
             "celery_result_backend": os.getenv("CELERY_RESULT_BACKEND", ""),
+            "use_real_backends": os.getenv("USE_REAL_BACKENDS", "false").lower() in ("1", "true", "yes"),
+            "search_backend": os.getenv("SEARCH_BACKEND", "stub"),
+            "search_api_key": os.getenv("SEARCH_API_KEY") or None,
+            "synthesizer_backend": os.getenv("SYNTHESIZER_BACKEND", "deterministic"),
+            "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY") or None,
         }
         settings = cls.model_validate(data)
         settings.validate()
