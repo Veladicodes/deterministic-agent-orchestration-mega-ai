@@ -9,6 +9,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -26,6 +27,7 @@ from evaluation import (
 )
 from orchestration.pipeline import PipelineRunner
 from shared.logging import get_logger
+from shared.settings import get_settings
 
 logger = get_logger("eval_cli.run_evaluation")
 
@@ -76,11 +78,23 @@ def save_results(
     with open(run_dir / "traces.jsonl", "w") as f:
         for trace in traces:
             trace_dict = trace.model_dump() if hasattr(trace, "model_dump") else trace
-            # Convert datetime fields to ISO format
+            # Convert datetime fields to ISO format explicitly. This must
+            # match evaluation/replay.py's _serialize_datetime (.isoformat(),
+            # "T" separator) exactly, or a recomputed hash will never equal
+            # the stored execution_hash: json.dumps(..., default=str) falls
+            # back to str(datetime) ("2026-01-01 00:00:00.000" — a space
+            # separator), which is a different string, and therefore hashes
+            # differently, than .isoformat()'s "2026-01-01T00:00:00.000".
+            # state_transitions is a List[Tuple[str, datetime]] and was the
+            # unhandled case that hit this fallback.
             if isinstance(trace_dict.get("created_at"), datetime):
                 trace_dict["created_at"] = trace_dict["created_at"].isoformat()
             if isinstance(trace_dict.get("replayed_at"), datetime):
                 trace_dict["replayed_at"] = trace_dict["replayed_at"].isoformat()
+            trace_dict["state_transitions"] = [
+                [state, ts.isoformat() if isinstance(ts, datetime) else ts]
+                for state, ts in trace_dict.get("state_transitions", [])
+            ]
             f.write(json.dumps(trace_dict, default=str) + "\n")
 
     logger.info(f"Results saved to {run_dir}")
@@ -108,7 +122,32 @@ def generate_reports(run_dir: Path, summary: Dict[str, Any], failure_patterns: D
     logger.info(f"Reports generated in {run_dir}")
 
 
-def build_metrics_from_result(query_id: str, result: Any, category: str) -> PipelineMetrics:
+def configure_backend(backend: str) -> None:
+    """Select stub (default, deterministic) or real backends for this run.
+
+    Real backends (Tavily search, Anthropic synthesis) are non-deterministic
+    by nature, so runs made with `--backend real` should be reported
+    separately from the deterministic `stub` baseline in BENCHMARKS.md
+    rather than averaged together (see evaluation metadata's "backend"
+    tag, written per query in build_metrics_from_result).
+    """
+    if backend == "stub":
+        os.environ["USE_REAL_BACKENDS"] = "false"
+    elif backend == "real":
+        os.environ["USE_REAL_BACKENDS"] = "true"
+        os.environ.setdefault("SEARCH_BACKEND", "tavily")
+        os.environ.setdefault("SYNTHESIZER_BACKEND", "llm")
+        if not os.environ.get("SEARCH_API_KEY"):
+            logger.warning("--backend real requested but SEARCH_API_KEY is not set; retrieval calls will fail closed")
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            logger.warning("--backend real requested but ANTHROPIC_API_KEY is not set; synthesis calls will fail closed")
+    else:
+        raise ValueError(f"unknown backend: {backend}")
+
+    get_settings.cache_clear()
+
+
+def build_metrics_from_result(query_id: str, result: Any, category: str, backend: str = "stub") -> PipelineMetrics:
     """Build evaluation metrics from a real pipeline result."""
     execution_trace = result.execution_trace or {}
     agent_events = execution_trace.get("agent_events", [])
@@ -116,6 +155,14 @@ def build_metrics_from_result(query_id: str, result: Any, category: str) -> Pipe
     latencies = {event.get("agent_id"): event.get("latency_ms", 0.0) for event in agent_events}
     tool_calls = execution_trace.get("tool_calls", [])
     summary = result.summary
+
+    total_cost_usd = 0.0
+    total_llm_tokens = 0
+    for call in tool_calls:
+        output = call.get("output") or {}
+        total_cost_usd += float(output.get("cost_usd", 0.0) or 0.0)
+        if call.get("tool_name") == "llm_synthesis":
+            total_llm_tokens += int(output.get("tokens", 0) or 0)
 
     return PipelineMetrics(
         job_id=summary.job_id,
@@ -136,7 +183,14 @@ def build_metrics_from_result(query_id: str, result: Any, category: str) -> Pipe
         synthesis_completeness=1.0 if result.final_answer else 0.0,
         confidence_score=0.75 if result.success else 0.25,
         timestamp=datetime.utcnow(),
-        metadata={"category": category, "query_id": query_id, "mode": "real_pipeline"},
+        metadata={
+            "category": category,
+            "query_id": query_id,
+            "mode": "real_pipeline",
+            "backend": backend,
+            "cost_usd": round(total_cost_usd, 6),
+            "llm_tokens": total_llm_tokens,
+        },
     )
 
 
@@ -184,10 +238,18 @@ def build_replay_trace(query_id: str, query: str, result: Any, metrics: Pipeline
 
 
 async def run_evaluation_async(
-    dataset: EvaluationDataset, output_dir: Path, verbose: bool = False
+    dataset: EvaluationDataset, output_dir: Path, verbose: bool = False, backend: str = "stub"
 ) -> None:
-    """Run the deterministic pipeline over the evaluation dataset."""
-    logger.info(f"Starting evaluation on {dataset.total_entries()} queries")
+    """Run the pipeline over the evaluation dataset.
+
+    `backend="stub"` (default) uses the deterministic tools and produces
+    the reproducible baseline numbers. `backend="real"` opts into
+    RealWebSearchTool/LLMSynthesizerAgent — those runs are non-deterministic
+    and must be reported as a separate result set (see BENCHMARKS.md),
+    never averaged with the stub baseline.
+    """
+    configure_backend(backend)
+    logger.info(f"Starting evaluation on {dataset.total_entries()} queries (backend={backend})")
 
     runner = EvaluationRunner(dataset)
     runner.initialize()
@@ -198,7 +260,7 @@ async def run_evaluation_async(
         logger.info(f"Processing query {i}/{dataset.total_entries()}: {entry['query_id']}")
 
         result = await pipeline_runner.run(entry["input_query"])
-        metrics = build_metrics_from_result(entry["query_id"], result, entry.get("category", "unknown"))
+        metrics = build_metrics_from_result(entry["query_id"], result, entry.get("category", "unknown"), backend=backend)
 
         runner.add_query_result(
             query_id=entry["query_id"],
@@ -261,6 +323,17 @@ def main():
         action="store_true",
         help="Verbose logging",
     )
+    parser.add_argument(
+        "--backend",
+        choices=["stub", "real"],
+        default="stub",
+        help=(
+            "stub (default): deterministic tools, reproducible baseline. "
+            "real: RealWebSearchTool + LLMSynthesizerAgent (requires "
+            "SEARCH_API_KEY / ANTHROPIC_API_KEY env vars); non-deterministic, "
+            "report separately from the stub baseline."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -280,7 +353,7 @@ def main():
 
     # Run evaluation
     try:
-        asyncio.run(run_evaluation_async(dataset, args.output, verbose=args.verbose))
+        asyncio.run(run_evaluation_async(dataset, args.output, verbose=args.verbose, backend=args.backend))
         logger.info("Evaluation completed successfully")
     except Exception as e:
         logger.error(f"Evaluation failed: {e}", exc_info=args.verbose)

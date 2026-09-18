@@ -2,33 +2,58 @@
 
 This document provides reference benchmark results and documents known limitations of the orchestration system.
 
+## Note: Replay Validation Bug Found and Fixed
+
+While building the replay/diff API and frontend, `scripts/validate_replays.py` was found to report **every** stored trace as invalid — including `results/demo_run/`'s committed example run, despite the README/BENCHMARKS badges claiming "Replay Validation: Pass." Root cause: `scripts/run_evaluation.py`'s trace writer serialized `state_transitions` timestamps via Python's default `str(datetime)` (space-separated, e.g. `"2026-01-01 00:00:00"`), while `evaluation/replay.py`'s hash computation uses `.isoformat()` (`T`-separated, e.g. `"2026-01-01T00:00:00"`) — two different strings, so the stored `execution_hash` could never match a recomputed one. Fixed by explicitly isoformatting `state_transitions` timestamps before serialization (matching the handling already present for `created_at`/`replayed_at`). Verified: `results/demo_run/` was regenerated and `scripts/validate_replays.py` now reports 44/44 valid (previously 40/40 invalid, unconditionally, for any run ever produced). This affected every prior run this project had ever produced, not just this session's new work.
+
 ## Baseline Results
 
-The current benchmark run is a deterministic local evaluation over the 40-query dataset. It measures the orchestration path with stubbed tools, so it is useful for system behavior and replayability, not for claims about internet-scale retrieval quality.
+The current benchmark run is a deterministic local evaluation over the 44-query dataset (`data/evaluation_dataset.json`, v1.1 — 4 queries added targeting real-backend provenance specificity, LLM-synthesis fluency, and the numeric-divergence contradiction tier; see "Real Backend Results" below). It measures the orchestration path with stubbed tools (`--backend stub`, the default), so it is useful for system behavior and replayability, not for claims about internet-scale retrieval quality.
 
-### Current Local Run
+### Current Local Run (`--backend stub`, dataset v1.1, 44 queries)
+
+Reproduce with: `python scripts/run_evaluation.py --dataset data/evaluation_dataset.json --output results/ --backend stub`
 
 | Metric | Value |
 |--------|-------|
 | **Completion Rate** | 100.0% |
-| **Avg Latency** | 141.9 ms |
-| **p95 Latency** | 249.3 ms |
-| **p99 Latency** | 249.5 ms |
+| **Avg Latency** | 136.4 ms |
+| **p50 Latency** | 122.1 ms |
+| **p95 Latency** | 250.9 ms |
+| **p99 Latency** | 259.3 ms |
 | **Retry Count** | 0.00/query |
-| **Provenance Coverage** | 100.0% |
+| **Provenance Coverage** | 90.9% |
 | **Confidence Score** | 0.750 |
 
 ### Category-Level Results
 
 | Category | Success Rate |
 |----------|--------------|
-| **Normal (10)** | 100.0% |
+| **Normal (11)** | 100.0% |
 | **Ambiguous (10)** | 100.0% |
 | **Adversarial (10)** | 100.0% |
-| **Contradiction-Prone (5)** | 100.0% |
-| **Provenance-Sensitive (5)** | 100.0% |
+| **Contradiction-Prone (6)** | 100.0% |
+| **Provenance-Sensitive (7)** | 100.0% |
 
-**Interpretation**: These results confirm that the orchestration path is deterministic and replayable under the current local tool stubs. They do not prove semantic retrieval quality or real-world source specificity.
+**Interpretation**: These results confirm that the orchestration path is deterministic and replayable under the current local tool stubs. They do not prove semantic retrieval quality or real-world source specificity. `completion_rate`/`success_rate` here measure whether the pipeline finished without a blocking failure — not whether the *content* of an answer is factually specific enough (see "Provenance Specificity" below, which is a real, still-open weakness of the stub tools that these completion numbers do not capture).
+
+---
+
+## Real Backend Results (Optional Configuration)
+
+`--backend real` (see `scripts/run_evaluation.py`, `orchestration/pipeline.py`) swaps in `RealWebSearchTool` (Tavily) and `LLMSynthesizerAgent` (Anthropic) behind the same agent interfaces. This is an **opt-in, non-deterministic configuration** — real search results and LLM output vary run to run, so these numbers must be reported separately from the stub baseline above, never averaged into it. Orchestration control flow, retries, budget accounting, and replay-hashing remain identical between the two configurations; only the Retriever's and Synthesizer's tool outputs are non-deterministic (see ARCHITECTURE.md's "Pluggable Backends and the Determinism Boundary" section).
+
+**Status**: The `--backend real` path, `RealWebSearchTool`, and `LLMSynthesizerAgent` are implemented and unit-tested (mocked HTTP; see `tests/tools/test_real_web_search_tool.py`, `tests/tools/test_llm_tool.py`, `tests/test_llm_synthesizer.py`), and each has an opt-in `@pytest.mark.integration` test that exercises the live API when a real key is present. **No live-API evaluation run has been executed yet in this environment** (no `SEARCH_API_KEY`/`ANTHROPIC_API_KEY` configured here) — this section intentionally reports methodology and cost tracking rather than fabricated numbers, consistent with this document's practice of only publishing measured results.
+
+To produce this section's numbers once keys are available:
+
+```bash
+export SEARCH_API_KEY=...
+export ANTHROPIC_API_KEY=...
+python scripts/run_evaluation.py --dataset data/evaluation_dataset.json --output results/ --backend real
+```
+
+Each query's `PipelineMetrics.metadata` will then carry `backend: "real"`, `cost_usd` (summed from `LLMTool`'s per-call estimate), and `llm_tokens` — sourced from the `tokens`/`cost_usd` fields that `LLMTool`/`RealWebSearchTool` already attach to `ToolResult.result` and that `orchestration/result_assembler.py` now threads into `execution_trace["tool_calls"][*]["output"]` with no database schema change. Once a real run exists, this section should report, side by side with the stub baseline: completion rate, latency, `provenance_sensitive_006`/`provenance_sensitive_007` pass/fail (the two queries specifically added to test whether real search can locate the actual cited paper, vs. the stub's generic snippets), and total `cost_usd`/`llm_tokens` for the run.
 
 **Provenance Coverage Definition**: "Provenance Coverage" is defined as the percentage of final synthesized claims that are linked to at least one provenance record in the `provenance_links` map of the `SynthesisOutput`. This metric measures traceability of claims, not the quality or authoritativeness of sources. A 100% value indicates every claim in the synthesized answer has at least one source reference recorded; it does not imply sources are peer-reviewed or high-quality.
 
@@ -50,6 +75,8 @@ The current benchmark run is a deterministic local evaluation over the 40-query 
 **Workaround**: Accept general information; flag queries requiring specific sources.
 
 **Fix level**: Medium (add arXiv API integration)
+
+**Status (v1.1)**: `RealWebSearchTool` (`tools/real_web_search_tool.py`, opt-in via `--backend real` / `SEARCH_BACKEND=tavily`) replaces the stub's hash-based fake results with a real search API, which should substantially narrow this gap — but has not yet been measured against this benchmark (see "Real Backend Results" above; no live API key available in this environment). Queries `provenance_sensitive_006` and `provenance_sensitive_007` were added specifically as regression tests for this fix. A dedicated arXiv API integration (rather than general web search) remains unimplemented and would likely still improve precision further for academic-paper lookups specifically.
 
 ### 2. Ambiguity Handling
 
@@ -80,6 +107,8 @@ The current benchmark run is a deterministic local evaluation over the 40-query 
 **Workaround**: Not applicable; this is edge-case behavior, not a common failure mode.
 
 **Fix level**: Hard (requires Bayesian reasoning in Critic)
+
+**Status (v1.1)**: A related but distinct gap — conflicting *numeric* claims about the same subject (e.g. "accuracy is 76%" vs "91%"), which the original fixed-keyword list could not detect at all — is now caught by a new numeric-divergence rule tier in `agents/contradiction_rules.py` (deterministic threshold-based comparison, not probabilistic/Bayesian reasoning). A negation-aware tier was also added (e.g. "improved" vs "did not improve"). See `tests/test_contradiction_rules.py` and regression query `contradiction_prone_006`. Full confidence-interval/Bayesian reasoning, as described in this limitation, remains unimplemented.
 
 ### 4. Tool Response Failures
 

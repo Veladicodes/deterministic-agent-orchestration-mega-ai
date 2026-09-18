@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "version": "1.0",
-    "dataset_id": "eval_dataset_v1_20260509",
-    "total_queries": 40,
+    "version": "1.1",
+    "dataset_id": "eval_dataset_v1_1_20260917",
+    "total_queries": 44,
     "categories": [
       "normal",
       "ambiguous",
@@ -11,7 +11,7 @@
       "provenance_sensitive"
     ],
     "created": "2026-05-09",
-    "notes": "Deterministic behavioral evaluation dataset. NOT designed for exact-match validation. Focus: execution observability, reproducibility, failure modes."
+    "notes": "Deterministic behavioral evaluation dataset. NOT designed for exact-match validation. Focus: execution observability, reproducibility, failure modes. v1.1 adds 4 entries targeting real-backend provenance specificity, LLM-synthesis fluency, and the numeric-divergence contradiction tier (see agents/contradiction_rules.py)."
   },
   "evaluation_entries": [
     {
@@ -821,6 +821,82 @@
       ],
       "expected_contradiction_behavior": "high_contradiction_rate",
       "evaluation_notes": "Consensus-seeking question presupposing flaw. Should decompose neutrally."
+    },
+    {
+      "query_id": "provenance_sensitive_006",
+      "category": "provenance_sensitive",
+      "input_query": "What was the exact accuracy reported in the original ResNet paper on ImageNet?",
+      "expected_decomposition_characteristics": [
+        "single_intent_lookup",
+        "specific_numeric_fact",
+        "named_source"
+      ],
+      "expected_provenance_requirements": [
+        "primary_source_paper",
+        "precise_citation"
+      ],
+      "expected_failure_modes": [
+        "generic_retrieval_instead_of_specific_source"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Targets the documented 'Provenance Specificity' weakness in BENCHMARKS.md: the deterministic stub retriever cannot locate a specific paper/benchmark. Intended to demonstrate the gap between --backend stub (generic snippets) and --backend real (a real search API that can surface the actual paper).",
+      "backend_target": "real"
+    },
+    {
+      "query_id": "provenance_sensitive_007",
+      "category": "provenance_sensitive",
+      "input_query": "Which arXiv paper first introduced the Transformer architecture and in what year?",
+      "expected_decomposition_characteristics": [
+        "single_intent_lookup",
+        "named_source",
+        "temporal_fact"
+      ],
+      "expected_provenance_requirements": [
+        "primary_source_paper",
+        "publication_year"
+      ],
+      "expected_failure_modes": [
+        "generic_retrieval_instead_of_specific_source"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Same class of provenance-specificity gap as provenance_sensitive_006, using a well-known, independently verifiable fact (Vaswani et al., 2017) so pass/fail is unambiguous when comparing stub vs. real search results.",
+      "backend_target": "real"
+    },
+    {
+      "query_id": "normal_011",
+      "category": "normal",
+      "input_query": "Summarize the tradeoffs between deterministic and LLM-based multi-agent orchestration in a short paragraph.",
+      "expected_decomposition_characteristics": [
+        "single_intent_summary",
+        "comparative_framing"
+      ],
+      "expected_provenance_requirements": [
+        "multiple_sources"
+      ],
+      "expected_failure_modes": [
+        "unlikely"
+      ],
+      "expected_contradiction_behavior": "low_contradiction_rate",
+      "evaluation_notes": "Targets LLM-synthesis fluency: with --backend stub the SynthesizerAgent produces concatenated claim fragments; with --backend real the LLMSynthesizerAgent should produce a coherent prose paragraph from the same filtered claim pool. Intended for side-by-side qualitative comparison of the two synthesis backends on identical upstream input.",
+      "backend_target": "real"
+    },
+    {
+      "query_id": "contradiction_prone_006",
+      "category": "contradiction_prone",
+      "input_query": "Is model accuracy 76% or 91% according to the benchmark?",
+      "expected_decomposition_characteristics": [
+        "single_intent_lookup",
+        "conflicting_numeric_claims"
+      ],
+      "expected_provenance_requirements": [
+        "multiple_sources"
+      ],
+      "expected_failure_modes": [
+        "contradiction_miss"
+      ],
+      "expected_contradiction_behavior": "high_contradiction_rate",
+      "evaluation_notes": "Regression query for the numeric-divergence contradiction tier added in agents/contradiction_rules.py. The original fixed-keyword CriticAgent could not detect conflicting numeric claims about the same subject; this query's two retrieved values (76% vs 91%) exceed NUMERIC_DIVERGENCE_THRESHOLD and should now be flagged.",
+      "backend_target": "stub"
     }
   ]
 }

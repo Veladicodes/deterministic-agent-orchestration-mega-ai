@@ -492,7 +492,7 @@ Structured metrics collected for the full pipeline.
 
 ## Step 8: Evaluation Metrics Summary
 
-When running full evaluation on 40-query dataset, this query contributes to aggregate statistics.
+When running full evaluation on the 44-query dataset, this query contributes to aggregate statistics.
 
 ```json
 {
