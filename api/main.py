@@ -4,6 +4,8 @@ from sqlalchemy import text
 import redis.asyncio as aioredis
 
 from api.routes import api_router
+from api.middleware.cors import install_cors
+from api.middleware.rate_limit import DailyRateLimitMiddleware
 from shared.settings import get_settings
 from shared.logging import configure_logging, get_logger
 from db.session import engine
@@ -14,6 +16,9 @@ app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
 )
+
+install_cors(app)
+app.add_middleware(DailyRateLimitMiddleware)
 
 
 @app.on_event("startup")
