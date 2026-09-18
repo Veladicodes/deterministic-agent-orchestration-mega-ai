@@ -21,7 +21,11 @@ from agents.decomposer import DecomposerAgent
 from agents.retriever import RetrieverAgent
 from agents.critic import CriticAgent
 from agents.synthesizer import SynthesizerAgent
+from agents.llm_synthesizer import LLMSynthesizerAgent
 from tools.self_reflection import SelfReflectionTool
+from tools.real_web_search_tool import RealWebSearchTool
+from tools.llm_tool import LLMTool
+from shared.settings import get_settings
 from orchestration.schemas import PipelineResult, AgentExecutionEvent
 from orchestration.state_manager import ExecutionStateManager
 from orchestration.retry_coordinator import RetryCoordinator, RetryConfig
@@ -185,7 +189,9 @@ class PipelineRunner:
 
         # Execute agents sequentially
         try:
+            await self._emit({"event_type": "agent_started", "agent_id": "decomposer"})
             await self._execute_decomposer(context, result_assembler)
+            await self._emit({"event_type": "agent_completed", "agent_id": "decomposer"})
             decomposer_output = next((item for item in context.agent_outputs if item.agent_id == "decomposer"), None)
             ambiguity_flags = context.sub_tasks[0].metadata.get("ambiguity_flags", []) if context.sub_tasks else []
             self_contained = self._query_is_self_contained(original_query, ambiguity_flags)
@@ -232,7 +238,9 @@ class PipelineRunner:
 
             retriever_output = None
             if not self_contained:
+                await self._emit({"event_type": "agent_started", "agent_id": "retriever"})
                 retriever_output = await self._execute_retriever(context, result_assembler)
+                await self._emit({"event_type": "agent_completed", "agent_id": "retriever"})
                 if not state_manager.can_continue():
                     state_manager.mark_partial_failure("retriever failed or returned no results")
 
@@ -270,7 +278,9 @@ class PipelineRunner:
                     metadata={"query": original_query},
                 )
                 await self._emit({"event_type": "routing_decision", "decision_type": "invoke_agent", "selected_action": "invoke_critic", "trigger_reason": "query benefits from contradiction check"})
+                await self._emit({"event_type": "agent_started", "agent_id": "critic"})
                 await self._execute_critic(context, result_assembler)
+                await self._emit({"event_type": "agent_completed", "agent_id": "critic"})
 
             if len(context.agent_outputs) > 4 or len(context.tool_call_log) > 6:
                 self._record_decision(
@@ -284,7 +294,9 @@ class PipelineRunner:
                 await self._emit({"event_type": "routing_decision", "decision_type": "context_compression", "selected_action": "compress_context", "trigger_reason": "context budget exceeded threshold"})
                 self._compress_context(context)
 
+            await self._emit({"event_type": "agent_started", "agent_id": "synthesizer"})
             await self._execute_synthesizer(context, result_assembler)
+            await self._emit({"event_type": "agent_completed", "agent_id": "synthesizer"})
             if not state_manager.can_continue():
                 # Synthesizer failure marks final failure
                 state_manager.mark_failed("synthesizer failed")
@@ -368,6 +380,41 @@ class PipelineRunner:
             result_assembler.record_agent_event(event)
             return False
 
+    def _build_web_search_tool(self):
+        """Select the retrieval backend based on settings.
+
+        Defaults to the deterministic stub tool (RetrieverAgent's own
+        default when `web_search_tool=None`) unless the operator has
+        explicitly opted into a real backend via settings. This keeps the
+        pipeline's default execution path deterministic and replayable.
+        """
+        try:
+            settings = get_settings()
+        except ValueError:
+            # Settings validation (e.g. missing DATABASE_URL) is not this
+            # method's concern; fall back to the deterministic stub.
+            return None
+
+        if settings.use_real_backends and settings.search_backend == "tavily":
+            return RealWebSearchTool(api_key=settings.search_api_key)
+        return None
+
+    def _build_synthesizer_agent(self, config: AgentConfig):
+        """Select the synthesizer backend based on settings.
+
+        Defaults to the deterministic SynthesizerAgent unless the operator
+        has explicitly opted into the LLM backend via settings.
+        """
+        try:
+            settings = get_settings()
+        except ValueError:
+            return SynthesizerAgent(config, self.budget_manager, self.exec_logger)
+
+        if settings.use_real_backends and settings.synthesizer_backend == "llm":
+            llm_tool = LLMTool(api_key=settings.anthropic_api_key)
+            return LLMSynthesizerAgent(config, self.budget_manager, self.exec_logger, llm_tool=llm_tool)
+        return SynthesizerAgent(config, self.budget_manager, self.exec_logger)
+
     async def _execute_retriever(self, context: SharedContext, result_assembler: ResultAssembler):
         """Execute RetrieverAgent.
 
@@ -385,7 +432,7 @@ class PipelineRunner:
             self._logger.info("executing %s", agent_id)
 
             config = AgentConfig(agent_id=agent_id, max_tokens=5000)
-            agent = RetrieverAgent(config, self.budget_manager, self.exec_logger)
+            agent = RetrieverAgent(config, self.budget_manager, self.exec_logger, web_search_tool=self._build_web_search_tool())
 
             retrieve_result = await agent.run(context)
 
@@ -533,7 +580,7 @@ class PipelineRunner:
             self._logger.info("executing %s", agent_id)
 
             config = AgentConfig(agent_id=agent_id, max_tokens=2000)
-            agent = SynthesizerAgent(config, self.budget_manager, self.exec_logger)
+            agent = self._build_synthesizer_agent(config)
 
             synthesis_result = await agent.run(context)
 

@@ -259,6 +259,10 @@ class ResultAssembler:
                     "success": call.failure is None,
                     "latency_ms": call.latency_ms,
                     "retries": call.retries,
+                    # Raw tool result payload (e.g. LLMTool's tokens/cost_usd,
+                    # RealWebSearchTool's results) — a generic JSON blob so
+                    # cost/usage reporting needs no schema/migration change.
+                    "output": call.output,
                 }
                 for call in context.tool_call_log
             ],
