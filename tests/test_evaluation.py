@@ -308,15 +308,21 @@ class TestExecutionReplayer:
         assert replayer.validate_trace(trace)
 
     def test_compare_traces(self):
-        """Test trace comparison."""
+        """Traces with identical content (including timestamps) compare as identical.
+
+        Timestamps are part of the hashed snapshot, so the two traces share one
+        explicit timestamp instead of calling ``datetime.utcnow()`` twice, which
+        differs on platforms with microsecond clock resolution.
+        """
         replayer = ExecutionReplayer()
+        shared_timestamp = datetime(2026, 1, 1, 12, 0, 0)
 
         trace1 = replayer.create_trace(
             original_job_id="job_001",
             query="test",
             agent_sequence=["decomposer", "synthesizer"],
             tool_calls=[{"id": "tool_1"}],
-            state_transitions=[("RUNNING", datetime.utcnow())],
+            state_transitions=[("RUNNING", shared_timestamp)],
             execution_path={},
         )
 
@@ -325,12 +331,39 @@ class TestExecutionReplayer:
             query="test",
             agent_sequence=["decomposer", "synthesizer"],
             tool_calls=[{"id": "tool_1"}],
-            state_transitions=[("RUNNING", datetime.utcnow())],
+            state_transitions=[("RUNNING", shared_timestamp)],
             execution_path={},
         )
 
         comparison = replayer.compare_traces(trace1, trace2)
         assert comparison["identical"]
+        assert comparison["divergence_count"] == 0
+
+    def test_compare_traces_flags_timestamp_divergence(self):
+        """Different state timestamps change the hash, so the traces diverge.
+
+        Documents the boundary: the core replayer hashes timestamps, and callers
+        that want wall-clock-independent comparison (api/routes/replay.py) must
+        normalise them first.
+        """
+        replayer = ExecutionReplayer()
+
+        def build(job_id: str, timestamp: datetime):
+            return replayer.create_trace(
+                original_job_id=job_id,
+                query="test",
+                agent_sequence=["decomposer", "synthesizer"],
+                tool_calls=[{"id": "tool_1"}],
+                state_transitions=[("RUNNING", timestamp)],
+                execution_path={},
+            )
+
+        trace1 = build("job_001", datetime(2026, 1, 1, 12, 0, 0))
+        trace2 = build("job_002", datetime(2026, 1, 1, 12, 0, 1))
+
+        comparison = replayer.compare_traces(trace1, trace2)
+        assert not comparison["identical"]
+        assert any("execution_hash divergence" in d for d in comparison["divergences"])
 
     def test_trace_hash_consistency(self):
         """Test deterministic trace hashes for identical execution content."""
