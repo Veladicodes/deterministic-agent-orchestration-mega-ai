@@ -1,13 +1,13 @@
-A Multi-Agent Orchestration System
+# 🧭 Deterministic Multi-Agent Orchestration
 
 A deterministic, operationally credible orchestration framework for multi-agent execution with full execution tracing, replayability, and behavioral evaluation.
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-green)
-![Tests](https://img.shields.io/badge/tests-122%20passing-brightgreen)
+[![Tests](https://github.com/Veladicodes/deterministic-agent-orchestration-mega-ai/actions/workflows/test.yml/badge.svg)](https://github.com/Veladicodes/deterministic-agent-orchestration-mega-ai/actions/workflows/test.yml)
 ![Execution](https://img.shields.io/badge/execution-deterministic-orange)
 ![Replay](https://img.shields.io/badge/replay-validated-blueviolet)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 # Evaluator Quickstart
 
